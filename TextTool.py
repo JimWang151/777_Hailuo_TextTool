@@ -73,18 +73,26 @@ class HL_TextToImage:
                 return font_path
         return None
 
-    def _wrap_text(self, text, max_chars_per_line):
-        """按最大字符数换行"""
+    def _wrap_text(self, text, font, max_width):
+        """按单词换行，确保单词不会被截断"""
+        words = text.split()
         lines = []
         current_line = ""
-        for char in text:
-            if len(current_line) + len(char) <= max_chars_per_line:
-                current_line += char
+
+        for word in words:
+            test_line = current_line + (" " if current_line else "") + word
+            text_width = font.getbbox(test_line)[2] - font.getbbox(test_line)[0]
+
+            if text_width <= max_width:
+                current_line = test_line
             else:
-                lines.append(current_line)
-                current_line = char
+                if current_line:
+                    lines.append(current_line)
+                current_line = word  # 新行从当前单词开始
+
         if current_line:
             lines.append(current_line)
+
         return lines
 
     def txt_2_img(self, seed, content, font, font_size, font_color, transparent, bg_color, max_chars_per_line, width, height, align, line_spacing, bold):
@@ -92,7 +100,6 @@ class HL_TextToImage:
 
         try:
             font_size = int(font_size)
-            max_chars_per_line = int(max_chars_per_line)
             width = int(width)
             height = int(height)
             align = int(align)
@@ -109,7 +116,7 @@ class HL_TextToImage:
             font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
 
         # 换行文本
-        wrapped_lines = self._wrap_text(content, max_chars_per_line)
+        wrapped_lines = self._wrap_text(content, font, width - 40)  # 预留左右边距
 
         # 计算文本尺寸
         temp_image = Image.new("RGBA", (1, 1))
@@ -165,19 +172,6 @@ class HL_TextToImage:
                 x_offset = 20
             elif align == 2:  # 居中对齐
                 x_offset = (width - text_width) // 2
-            elif align == 3:  # 两端对齐
-                words = line.split()
-                if len(words) > 1:
-                    total_word_width = sum(font.getbbox(word)[2] - font.getbbox(word)[0] for word in words)
-                    extra_space = (width - total_word_width - 40) // (len(words) - 1)
-                    x_offset = 20
-                    for word in words:
-                        self._draw_bold_text(draw, x_offset, y_offset, word, font, text_fill, bold)
-                        x_offset += font.getbbox(word)[2] - font.getbbox(word)[0] + extra_space
-                    y_offset += text_height + line_spacing
-                    continue
-                else:
-                    x_offset = 20
 
             self._draw_bold_text(draw, x_offset, y_offset, line, font, text_fill, bold)
             y_offset += text_height + line_spacing
@@ -196,6 +190,7 @@ class HL_TextToImage:
                 draw.text((x + dx, y + dy), text, font=font, fill=fill)
         else:
             draw.text((x, y), text, font=font, fill=fill)
+
 
 class HL_FilterImage:
     def __init__(self):
