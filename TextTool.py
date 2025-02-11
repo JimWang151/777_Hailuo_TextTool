@@ -32,8 +32,8 @@ class HL_TextToImage:
             "required": {
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff,
                                  "tooltip": "The random seed used for creating the noise."}),
-                "content": ("STRING", {"default": ''}),
-                "font": ("STRING", {"default": ''}),
+                "content": ("STRING", {"default": 'Trial Version'}),
+                "font": ("STRING", {"default": 'Courier New'}),
                 "font_size": ("STRING", {"default": '40'}),
                 "font_color": ("STRING", {"default": 'black'}),
                 "transparent": ("STRING", {"default": '1'}),
