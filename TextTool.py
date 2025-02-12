@@ -54,24 +54,54 @@ class HL_TextToImage:
     CATEGORY = "HL_Tools"
     DESCRIPTION = "Tools for generating text images"
 
+    import os
+    import platform
+
     def _find_font_file(self, font_name):
-        """查找字体文件"""
-        windows_font_path = "C:/Windows/Fonts"
-        font_mapping = {
-            "Arial": "arial.ttf",
-            "Times New Roman": "times.ttf",
-            "Courier New": "cour.ttf",
-            "Verdana": "verdana.ttf",
-            "Tahoma": "tahoma.ttf",
-            "SimSun": "simsun.ttc",
-            "SimHei": "simhei.ttf",
-        }
+        """根据操作系统查找字体文件"""
+
+        system_name = platform.system()
+
+        if system_name == "Windows":
+            font_paths = ["C:/Windows/Fonts"]
+            font_mapping = {
+                "Arial": "arial.ttf",
+                "Times New Roman": "times.ttf",
+                "Courier New": "cour.ttf",
+                "Verdana": "verdana.ttf",
+                "Tahoma": "tahoma.ttf",
+                "SimSun": "simsun.ttc",
+                "SimHei": "simhei.ttf",
+            }
+
+        elif system_name == "Linux":
+            font_paths = [
+                "/usr/share/fonts/truetype",
+                "/usr/share/fonts",
+                "~/.fonts",
+            ]
+            font_mapping = {
+                "Arial": "arial.ttf",
+                "Times New Roman": "times.ttf",
+                "Courier New": "cour.ttf",
+                "Verdana": "verdana.ttf",
+                "Tahoma": "tahoma.ttf",
+                "Noto Sans": "NotoSans-Regular.ttf",
+                "DejaVu Sans": "DejaVuSans.ttf",
+            }
+
+        else:
+            return None  # 其他系统暂不支持
+
+        # 搜索字体文件
         if font_name in font_mapping:
             font_file = font_mapping[font_name]
-            font_path = os.path.join(windows_font_path, font_file)
-            if os.path.exists(font_path):
-                return font_path
-        return None
+            for font_path in font_paths:
+                full_path = os.path.join(font_path, font_file)
+                if os.path.exists(full_path):
+                    return full_path
+
+        return None  # 找不到字体
 
     def _wrap_text(self, text, font, max_width):
         """按单词换行，确保单词不会被截断"""
@@ -143,6 +173,9 @@ class HL_TextToImage:
                 "red": (255, 0, 0),
                 "white": (255, 255, 255),
                 "black": (0, 0, 0),
+                "yellow": (255, 255, 0),
+                "orange": (255, 165, 0),
+                "cyan": (0, 255, 255),
             }
             background_color = color_mapping.get(bg_color, (255, 255, 255))
 
@@ -157,6 +190,13 @@ class HL_TextToImage:
             "green": (0, 255, 0, 255),
             "blue": (0, 0, 255, 255),
             "white": (255, 255, 255, 255),
+            "yellow": (255, 255, 0, 255),
+            "purple": (128, 0, 128, 255),
+            "orange": (255, 165, 0, 255),
+            "pink": (255, 192, 203, 255),
+            "brown": (139, 69, 19, 255),
+            "gray": (169, 169, 169, 255),
+            "cyan": (0, 255, 255, 255),
         }
         text_fill = font_color_mapping.get(font_color, (0, 0, 0, 255))
 
