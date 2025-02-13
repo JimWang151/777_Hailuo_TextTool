@@ -3,6 +3,8 @@
 import collections
 import json
 import os
+import os
+import platform
 import random
 import time
 import urllib.parse
@@ -23,8 +25,7 @@ from comfy.cli_args import args
 from lxml import etree
 from torchvision.transforms import ToPILImage, ToTensor
 from torchvision.transforms.functional import to_tensor, to_pil_image
-import os
-import platform
+
 
 class HL_TextToImage:
     @classmethod
@@ -78,6 +79,7 @@ class HL_TextToImage:
             font_paths = [
                 "/usr/share/fonts/truetype",
                 "/usr/share/fonts",
+                "/usr/share/fonts/truetype/dejavu",
                 "~/.fonts",
             ]
             font_mapping = {
