@@ -90,6 +90,8 @@ class HL_TextToImage:
                 "Tahoma": "tahoma.ttf",
                 "Noto Sans": "NotoSans-Regular.ttf",
                 "DejaVu Sans": "DejaVuSans.ttf",
+                "Althelas": "Athelas-Regular.ttf",
+                "AlthelasBold": "Athelas-Bold.ttf",
             }
 
         else:
