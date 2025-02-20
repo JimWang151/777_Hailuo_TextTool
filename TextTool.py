@@ -73,6 +73,8 @@ class HL_TextToImage:
                 "Tahoma": "tahoma.ttf",
                 "SimSun": "simsun.ttc",
                 "SimHei": "simhei.ttf",
+                "Althelas": "Athelas-Regular.ttf",
+                "AlthelasBold": "Athelas-Bold.ttf",
             }
 
         elif system_name == "Linux":
