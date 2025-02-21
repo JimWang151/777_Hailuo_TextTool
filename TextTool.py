@@ -27,6 +27,12 @@ from torchvision.transforms import ToPILImage, ToTensor
 from torchvision.transforms.functional import to_tensor, to_pil_image
 
 
+import platform
+import os
+from PIL import Image, ImageDraw, ImageFont
+import numpy as np
+import torch
+
 class HL_TextToImage:
     @classmethod
     def INPUT_TYPES(s):
@@ -56,7 +62,20 @@ class HL_TextToImage:
     CATEGORY = "HL_Tools"
     DESCRIPTION = "Tools for generating text images"
 
+    # 新增颜色转换方法
+    def hex_to_rgba(self, hex_color):
+        """将十六进制颜色代码转换为 RGBA 元组，支持 #ABC 和 #AABBCC 格式"""
+        hex_color = hex_color.lstrip('#')
+        if len(hex_color) == 3:  # 如果是 #RGB 格式，扩展为 #RRGGBB
+            hex_color = ''.join([c * 2 for c in hex_color])
 
+        if len(hex_color) != 6:
+            raise ValueError("Invalid hex color format")
+
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        return (r, g, b, 255)  # 默认透明度为 255（不透明）
 
     def _find_font_file(self, font_name):
         """根据操作系统查找字体文件"""
@@ -190,6 +209,7 @@ class HL_TextToImage:
         draw = ImageDraw.Draw(img)
 
         # 文字颜色
+        #font_color = "black"
         font_color_mapping = {
             "black": (0, 0, 0, 255),
             "red": (255, 0, 0, 255),
@@ -204,7 +224,17 @@ class HL_TextToImage:
             "gray": (169, 169, 169, 255),
             "cyan": (0, 255, 255, 255),
         }
-        text_fill = font_color_mapping.get(font_color, (0, 0, 0, 255))
+
+        if font_color.startswith('#'):
+            # 如果是以 # 号开头的颜色代码，则调用 color_mapping 方法
+            try:
+                text_fill = self.hex_to_rgba(font_color)
+            except:
+                # 如果颜色代码无效，使用默认颜色
+                text_fill = (0, 0, 0, 255)
+        else:
+            # 使用预定义的颜色名称
+            text_fill = font_color_mapping.get(font_color, (0, 0, 0, 255))
 
         # 文字绘制起始位置
         y_offset = (height - total_text_height) // 2
