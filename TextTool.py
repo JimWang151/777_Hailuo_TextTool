@@ -38,20 +38,20 @@ class HL_TextToImage:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff,
-                                 "tooltip": "The random seed used for creating the noise."}),
                 "content": ("STRING", {"default": 'Trial Version'}),
-                "font": ("STRING", {"default": 'Courier New'}),
-                "font_size": ("STRING", {"default": '40'}),
-                "font_color": ("STRING", {"default": 'black'}),
-                "transparent": ("STRING", {"default": '1'}),
-                "bg_color": ("STRING", {"default": ''}),
+                "font":  (["Arial", "Times New Roman", "Courier New","Verdana", "Tahoma", "SimSun","SimHei", "Althelas","AlthelasBold"],),
+                "font_size": ("INT", {"default": 30, "min": 10, "max": 60, "step": 10}),
+                "font_color": (["green", "red", "white","black", "yellow", "orange","cyan"],),
+                "transparent": ("BOOLEAN", {"default": 'true'}),
+                "bg_color": (["green", "red", "white","black", "yellow", "orange","cyan"],),
                 "max_chars_per_line": ("STRING", {"default": '100'}),
-                "width": ("STRING", {"default": '400'}),
-                "height": ("STRING", {"default": '200'}),
-                "align": ("STRING", {"default": '1'}),  # 1 左对齐，2 居中对齐，3 两端对齐
-                "line_spacing": ("STRING", {"default": '10'}),  # 行间距
-                "bold": ("STRING", {"default": '0'})  # 是否加粗 (0: 否, 1: 是)
+                "width": ("INT", {"default": 512, "min": 32, "max": 1024, "step": 32}),
+                "height": ("INT", {"default": 512, "min": 32, "max": 1024, "step": 32}),
+                "x_align": (["LEFT", "CENTER"],{"default":'CENTER'}),
+                "y_align": (["TOP", "CENTER", "BOTTOM"],{"default":'CENTER'}),  # 是否加粗 (0: 否, 1: 是)
+                "line_spacing": ("INT", {"default": 30, "min": 10, "max": 60, "step": 10}),  # 行间距
+                "bold": ("BOOLEAN", {"default": 'false'}) , # 是否加粗 (0: 否, 1: 是)
+                "by_ratio": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
             },
         }
 
@@ -150,20 +150,9 @@ class HL_TextToImage:
 
         return lines
 
-    def txt_2_img(self, seed, content, font, font_size, font_color, transparent, bg_color, max_chars_per_line, width, height, align, line_spacing, bold):
-        """生成文字图片"""
+    def txt_2_img(self, content, font, font_size, font_color, transparent, bg_color, max_chars_per_line, width,
+                  height, x_align, line_spacing, bold, y_align, by_ratio):
 
-        try:
-            font_size = int(font_size)
-            width = int(width)
-            height = int(height)
-            align = int(align)
-            line_spacing = int(line_spacing)
-            bold = bool(int(bold))  # 转换为布尔值
-        except ValueError:
-            return None, "Invalid input parameters"
-
-        # 查找字体文件
         font_path = self._find_font_file(font)
         if font_path is None:
             font = ImageFont.load_default()
@@ -190,7 +179,7 @@ class HL_TextToImage:
         total_text_height = sum(line_heights) + (len(wrapped_lines) - 1) * line_spacing
 
         # 背景颜色
-        if transparent == "1":
+        if transparent == True:
             background_color = (0, 0, 0, 0)  # 透明背景
         else:
             color_mapping = {
@@ -209,7 +198,7 @@ class HL_TextToImage:
         draw = ImageDraw.Draw(img)
 
         # 文字颜色
-        #font_color = "black"
+        # font_color = "black"
         font_color_mapping = {
             "black": (0, 0, 0, 255),
             "red": (255, 0, 0, 255),
@@ -221,7 +210,7 @@ class HL_TextToImage:
             "orange": (255, 165, 0, 255),
             "pink": (255, 192, 203, 255),
             "brown": (139, 69, 19, 255),
-            "gray": (169, 169, 169, 255),
+            "gray": (196, 169, 169, 255),
             "cyan": (0, 255, 255, 255),
         }
 
@@ -236,18 +225,35 @@ class HL_TextToImage:
             # 使用预定义的颜色名称
             text_fill = font_color_mapping.get(font_color, (0, 0, 0, 255))
 
-        # 文字绘制起始位置
-        y_offset = (height - total_text_height) // 2
+        # 根据 y_align 参数计算文字绘制的起始 y 偏移量
+        if by_ratio != 0.0:
+            # 如果 by_ratio 不为 0，则根据比例计算 x_offset 和 y_offset
+            x_offset = int(width * by_ratio)
+            y_offset = int(height * by_ratio)
+        else:
+            if y_align == "CENTER":  # 竖向居中
+                y_offset = (height - total_text_height) // 2
+            elif y_align == "TOP":  # 竖向靠最向上
+                y_offset = 5  # 预留顶部边距
+            elif y_align == "BOTTOM":  # 竖向靠最底下
+                y_offset = height - total_text_height - 5  # 预留底部边距
+            else:
+                # 默认竖向居中
+                y_offset = (height - total_text_height) // 2
 
         for line in wrapped_lines:
             text_bbox = font.getbbox(line)
             text_width = text_bbox[2] - text_bbox[0]
             text_height = text_bbox[3] - text_bbox[1]
 
-            if align == 1:  # 左对齐
-                x_offset = 20
-            elif align == 2:  # 居中对齐
-                x_offset = (width - text_width) // 2
+            if by_ratio != 0.0:
+                # 如果 by_ratio 不为 0，则使用根据比例计算的 x_offset
+                pass
+            else:
+                if x_align == "LEFT":  # 左对齐
+                    x_offset = 10
+                elif x_align == "CENTER":  # 居中对齐
+                    x_offset = (width - text_width) // 2
 
             self._draw_bold_text(draw, x_offset, y_offset, line, font, text_fill, bold)
             y_offset += text_height + line_spacing
