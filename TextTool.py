@@ -34,6 +34,103 @@ import numpy as np
 import torch
 
 class HL_TextToImage:
+
+    def __init__(self):
+        # 解析 XML 文件
+        self.supported_font_extensions = [".ttf"]
+        self.destination_font_dir = "/usr/share/fonts/"  # 硬编码字体安装目标目录
+
+        # 获取当前目录下的 font 文件夹路径
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.fonts_dir = os.path.join(current_dir, "font")
+
+        self.install_font_batch()  # 自动安装字体
+
+    def validate_font_file(self, font_path):
+        """
+        验证字体文件路径和文件类型
+        """
+        if not os.path.exists(font_path):
+            raise FileNotFoundError(f"字体文件 {font_path} 不存在！")
+
+        file_extension = os.path.splitext(font_path)[1]
+        if file_extension.lower() not in self.supported_font_extensions:
+            raise ValueError(
+                f"支持的字体类型为：{'、'.join(self.supported_font_extensions)}，当前文件为 '{file_extension}'！")
+
+    def check_font_installed(self, font_path):
+        """
+        检查字体文件是否已安装
+        """
+        self.validate_font_file(font_path)  # 先验证字体文件
+
+        font_file_name = os.path.basename(font_path)
+        font_dirs = [self.destination_font_dir, os.path.expanduser("~/.fonts/")]  # 常见的字体目录
+        for directory in font_dirs:
+            if directory and os.path.exists(directory):
+                if font_file_name in os.listdir(directory):
+                    return True
+        return False
+
+    def install_font(self, font_path):
+        """
+        将字体文件安装到目标目录
+        """
+        self.validate_font_file(font_path)  # 验证字体文件
+
+        destination_path = os.path.join(self.destination_font_dir, os.path.basename(font_path))
+
+        # 检查目标目录是否存在，不存在则创建
+        if not os.path.exists(self.destination_font_dir):
+            os.makedirs(self.destination_font_dir)
+
+        # 复制字体文件到目标目录
+        shutil.copy2(font_path, destination_path)
+
+        return destination_path
+
+    @staticmethod
+    def refresh_font_cache():
+        """
+        刷新字体缓存（跨平台）
+        """
+        system = platform.system()
+        try:
+            if system == "Linux":
+                subprocess.run(["fc-cache", "-f"], capture_output=True, check=True)
+                print("字体缓存刷新完成！")
+            elif system == "Windows":
+                subprocess.run(["powershell", "Start-Process", "C:\\Windows\\System32\\control.exe", "-ArgumentList",
+                                "'C:\\Windows\\Fonts'"], check=True)
+                print("字体缓存刷新完成！")
+            else:
+                print(f"不支持的操作系统：{system}，无法刷新字体缓存！")
+        except subprocess.CalledProcessError as e:
+            print(f"刷新字体缓存失败：{e}")
+
+    def install_font_batch(self):
+        """
+        批量安装字体
+        """
+        if not os.path.exists(self.fonts_dir):
+            raise FileNotFoundError(f"字体文件夹不存在：{self.fonts_dir}！")
+
+        for font_file in os.listdir(self.fonts_dir):
+            font_path = os.path.join(self.fonts_dir, font_file)
+            if os.path.isfile(font_path) and font_path.lower().endswith(".ttf"):
+                try:
+                    # 检查字体是否已安装
+                    if self.check_font_installed(font_path):
+                        print(f"字体 {font_file} 已经安装，跳过安装过程！")
+                    else:
+                        print(f"正在安装字体 {font_file} 到 {self.destination_font_dir} ...")
+                        self.install_font(font_path)
+                        print(f"字体 {font_file} 安装成功！")
+                except Exception as e:
+                    print(f"字体 {font_file} 安装失败：{e}")
+
+        self.refresh_font_cache()
+
     @classmethod
     def INPUT_TYPES(s):
         return {
