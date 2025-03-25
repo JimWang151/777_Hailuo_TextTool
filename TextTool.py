@@ -23,6 +23,7 @@ from PIL import Image, ImageOps, ImageSequence, ImageFile
 from PIL.PngImagePlugin import PngInfo
 from comfy.cli_args import args
 from lxml import etree
+import subprocess
 from torchvision.transforms import ToPILImage, ToTensor
 from torchvision.transforms.functional import to_tensor, to_pil_image
 
