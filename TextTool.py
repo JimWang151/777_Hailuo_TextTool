@@ -12,6 +12,7 @@ import urllib.request
 import uuid
 import xml.etree.ElementTree as ET
 from typing import List, Dict
+import shutil
 
 import comfy.utils
 import folder_paths
