@@ -1,8 +1,5 @@
-# Made by JimWang for ComfyUI
-# 02/04/2023
 import collections
 import json
-import os
 import os
 import platform
 import random
@@ -28,18 +25,11 @@ import subprocess
 from torchvision.transforms import ToPILImage, ToTensor
 from torchvision.transforms.functional import to_tensor, to_pil_image
 
-
-import platform
-import os
-from PIL import Image, ImageDraw, ImageFont
-import numpy as np
-import torch
-
 class HL_TextToImage:
 
     def __init__(self):
         # 解析 XML 文件
-        self.supported_font_extensions = [".ttf"]
+        self.supported_font_extensions = [".ttf",".otf"]
         self.destination_font_dir = "/usr/share/fonts/"  # 硬编码字体安装目标目录
 
         # 获取当前目录下的 font 文件夹路径
@@ -100,11 +90,11 @@ class HL_TextToImage:
         try:
             if system == "Linux":
                 subprocess.run(["fc-cache", "-f"], capture_output=True, check=True)
-                print("字体缓存刷新完成！")
+                
             elif system == "Windows":
                 subprocess.run(["powershell", "Start-Process", "C:\\Windows\\System32\\control.exe", "-ArgumentList",
                                 "'C:\\Windows\\Fonts'"], check=True)
-                print("字体缓存刷新完成！")
+                
             else:
                 print(f"不支持的操作系统：{system}，无法刷新字体缓存！")
         except subprocess.CalledProcessError as e:
@@ -122,12 +112,10 @@ class HL_TextToImage:
             if os.path.isfile(font_path) and font_path.lower().endswith(".ttf"):
                 try:
                     # 检查字体是否已安装
-                    if self.check_font_installed(font_path):
-                        print(f"字体 {font_file} 已经安装，跳过安装过程！")
-                    else:
+                    if not self.check_font_installed(font_path):
                         print(f"正在安装字体 {font_file} 到 {self.destination_font_dir} ...")
                         self.install_font(font_path)
-                        print(f"字体 {font_file} 安装成功！")
+                        
                 except Exception as e:
                     print(f"字体 {font_file} 安装失败：{e}")
 
@@ -138,19 +126,19 @@ class HL_TextToImage:
         return {
             "required": {
                 "content": ("STRING", {"default": 'Trial Version'}),
-                "font":  (["Arial", "Times New Roman", "Courier New","Verdana", "Tahoma", "SimSun","SimHei", "Althelas","AlthelasBold"],),
-                "font_size": ("INT", {"default": 30, "min": 10, "max": 60, "step": 10}),
-                "font_color": (["green", "red", "white","black", "yellow", "orange","cyan"],),
-                "transparent": ("BOOLEAN", {"default": 'true'}),
-                "bg_color": (["green", "red", "white","black", "yellow", "orange","cyan"],),
+                "font": (["Arial", "Times New Roman", "Courier New", "Verdana", "Tahoma", "SimSun", "SimHei", "Althelas", "AlthelasBold","Suite Home"],),
+                "font_size": ("INT", {"default": 30, "min": 10, "max": 200, "step": 2}),
+                "font_color": (["green", "red", "white", "black", "yellow", "orange", "cyan"],),
+                "transparent": ("BOOLEAN", {"default": True}),
+                "bg_color": (["green", "red", "white", "black", "yellow", "orange", "cyan"],),
                 "max_chars_per_line": ("STRING", {"default": '100'}),
-                "width": ("INT", {"default": 512, "min": 32, "max": 1024, "step": 32}),
-                "height": ("INT", {"default": 512, "min": 32, "max": 1024, "step": 32}),
-                "x_align": (["LEFT", "CENTER"],{"default":'CENTER'}),
-                "y_align": (["TOP", "CENTER", "BOTTOM"],{"default":'CENTER'}),  # 是否加粗 (0: 否, 1: 是)
-                "line_spacing": ("INT", {"default": 30, "min": 10, "max": 60, "step": 10}),  # 行间距
-                "bold": ("BOOLEAN", {"default": 'false'}) , # 是否加粗 (0: 否, 1: 是)
-                "by_ratio": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "width": ("INT", {"default": 512, "min": 32, "max": 2048, "step": 1}),
+                "height": ("INT", {"default": 512, "min": 32, "max": 2048, "step": 1}),
+                "x_align": (["LEFT", "CENTER", "RIGHT"], {"default": 'CENTER'}),
+                "y_align": (["TOP", "CENTER", "BOTTOM"], {"default": 'CENTER'}),
+                "line_spacing": ("INT", {"default": 30, "min": 10, "max": 60, "step": 2}),
+                "bold": ("BOOLEAN", {"default": False}),
+                "by_ratio": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, " inquisitive_step": 0.01}),
             },
         }
 
@@ -161,7 +149,6 @@ class HL_TextToImage:
     CATEGORY = "HL_Tools"
     DESCRIPTION = "Tools for generating text images"
 
-    # 新增颜色转换方法
     def hex_to_rgba(self, hex_color):
         """将十六进制颜色代码转换为 RGBA 元组，支持 #ABC 和 #AABBCC 格式"""
         hex_color = hex_color.lstrip('#')
@@ -178,7 +165,6 @@ class HL_TextToImage:
 
     def _find_font_file(self, font_name):
         """根据操作系统查找字体文件"""
-
         system_name = platform.system()
 
         if system_name == "Windows":
@@ -193,6 +179,7 @@ class HL_TextToImage:
                 "SimHei": "simhei.ttf",
                 "Althelas": "Athelas-Regular.ttf",
                 "AlthelasBold": "Athelas-Bold.ttf",
+		        "Suite Home": "Suite.otf",
             }
 
         elif system_name == "Linux":
@@ -212,6 +199,7 @@ class HL_TextToImage:
                 "DejaVu Sans": "DejaVuSans.ttf",
                 "Althelas": "Athelas-Regular.ttf",
                 "AlthelasBold": "Athelas-Bold.ttf",
+                "Suite Home": "Suite.otf",
             }
 
         else:
@@ -258,6 +246,7 @@ class HL_TextToImage:
         else:
             font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
 
+
         # 换行文本
         wrapped_lines = self._wrap_text(content, font, width - 40)  # 预留左右边距
 
@@ -278,7 +267,7 @@ class HL_TextToImage:
         total_text_height = sum(line_heights) + (len(wrapped_lines) - 1) * line_spacing
 
         # 背景颜色
-        if transparent == True:
+        if transparent:
             background_color = (0, 0, 0, 0)  # 透明背景
         else:
             color_mapping = {
@@ -297,7 +286,6 @@ class HL_TextToImage:
         draw = ImageDraw.Draw(img)
 
         # 文字颜色
-        # font_color = "black"
         font_color_mapping = {
             "black": (0, 0, 0, 255),
             "red": (255, 0, 0, 255),
@@ -314,30 +302,25 @@ class HL_TextToImage:
         }
 
         if font_color.startswith('#'):
-            # 如果是以 # 号开头的颜色代码，则调用 color_mapping 方法
             try:
                 text_fill = self.hex_to_rgba(font_color)
             except:
-                # 如果颜色代码无效，使用默认颜色
                 text_fill = (0, 0, 0, 255)
         else:
-            # 使用预定义的颜色名称
             text_fill = font_color_mapping.get(font_color, (0, 0, 0, 255))
 
         # 根据 y_align 参数计算文字绘制的起始 y 偏移量
         if by_ratio != 0.0:
-            # 如果 by_ratio 不为 0，则根据比例计算 x_offset 和 y_offset
             x_offset = int(width * by_ratio)
             y_offset = int(height * by_ratio)
         else:
-            if y_align == "CENTER":  # 竖向居中
+            if y_align == "CENTER":
                 y_offset = (height - total_text_height) // 2
-            elif y_align == "TOP":  # 竖向靠最向上
-                y_offset = 5  # 预留顶部边距
-            elif y_align == "BOTTOM":  # 竖向靠最底下
-                y_offset = height - total_text_height - 5  # 预留底部边距
+            elif y_align == "TOP":
+                y_offset = 5
+            elif y_align == "BOTTOM":
+                y_offset = height - total_text_height - 5
             else:
-                # 默认竖向居中
                 y_offset = (height - total_text_height) // 2
 
         for line in wrapped_lines:
@@ -346,13 +329,14 @@ class HL_TextToImage:
             text_height = text_bbox[3] - text_bbox[1]
 
             if by_ratio != 0.0:
-                # 如果 by_ratio 不为 0，则使用根据比例计算的 x_offset
                 pass
             else:
-                if x_align == "LEFT":  # 左对齐
+                if x_align == "LEFT":
                     x_offset = 10
-                elif x_align == "CENTER":  # 居中对齐
+                elif x_align == "CENTER":
                     x_offset = (width - text_width) // 2
+                elif x_align == "RIGHT":
+                    x_offset = width - text_width - 10  # 右对齐，留 10 像素边距
 
             self._draw_bold_text(draw, x_offset, y_offset, line, font, text_fill, bold)
             y_offset += text_height + line_spacing
