@@ -130,7 +130,6 @@ class HL_TextToImage:
                 "font": (["Arial", "Times New Roman", "Courier New", "Verdana", "Tahoma", "SimSun", "SimHei", "Althelas", "AlthelasBold","Suite Home"],),
                 "font_size": ("INT", {"default": 30, "min": 10, "max": 200, "step": 2}),
                 "font_color": (font_color_options, {"default": 'black'}),  # 增加新选项
-                "color_code": ("STRING", {"default": "#000000"}),  # 新增颜色代码参数
                 "transparent": ("BOOLEAN", {"default": True}),
                 "bg_color": (["green", "red", "white", "black", "yellow", "orange", "cyan"],),
                 "max_chars_per_line": ("STRING", {"default": '100'}),
@@ -142,6 +141,7 @@ class HL_TextToImage:
                 "bold": ("BOOLEAN", {"default": False}),
                 "rotation_angle": ("FLOAT", {"default": 0.0, "min": -360.0, "max": 360.0, "step": 0.5}),
                 "by_ratio": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "color_code": ("STRING", {"default": "#000000"}),  # 新增颜色代码参数
             },
         }
 
