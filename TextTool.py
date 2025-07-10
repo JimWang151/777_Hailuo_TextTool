@@ -109,7 +109,7 @@ class HL_TextToImage:
 
         for font_file in os.listdir(self.fonts_dir):
             font_path = os.path.join(self.fonts_dir, font_file)
-            if os.path.isfile(font_path) and font_path.lower().endswith(".ttf"):
+            if os.path.isfile(font_path) :
                 try:
                     # 检查字体是否已安装
                     if not self.check_font_installed(font_path):
@@ -123,12 +123,14 @@ class HL_TextToImage:
 
     @classmethod
     def INPUT_TYPES(s):
+        font_color_options = ["green", "red", "white", "black", "yellow", "orange", "cyan", "by color code"]
         return {
             "required": {
                 "content": ("STRING", {"default": 'Trial Version'}),
                 "font": (["Arial", "Times New Roman", "Courier New", "Verdana", "Tahoma", "SimSun", "SimHei", "Althelas", "AlthelasBold","Suite Home"],),
                 "font_size": ("INT", {"default": 30, "min": 10, "max": 200, "step": 2}),
-                "font_color": (["green", "red", "white", "black", "yellow", "orange", "cyan"],),
+                "font_color": (font_color_options, {"default": 'black'}),  # 增加新选项
+                "color_code": ("STRING", {"default": "#000000"}),  # 新增颜色代码参数
                 "transparent": ("BOOLEAN", {"default": True}),
                 "bg_color": (["green", "red", "white", "black", "yellow", "orange", "cyan"],),
                 "max_chars_per_line": ("STRING", {"default": '100'}),
@@ -138,7 +140,8 @@ class HL_TextToImage:
                 "y_align": (["TOP", "CENTER", "BOTTOM"], {"default": 'CENTER'}),
                 "line_spacing": ("INT", {"default": 30, "min": 10, "max": 60, "step": 2}),
                 "bold": ("BOOLEAN", {"default": False}),
-                "by_ratio": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, " inquisitive_step": 0.01}),
+                "rotation_angle": ("FLOAT", {"default": 0.0, "min": -360.0, "max": 360.0, "step": 0.5}),
+                "by_ratio": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
             },
         }
 
@@ -179,7 +182,7 @@ class HL_TextToImage:
                 "SimHei": "simhei.ttf",
                 "Althelas": "Athelas-Regular.ttf",
                 "AlthelasBold": "Athelas-Bold.ttf",
-		        "Suite Home": "Suite.otf",
+		 "Suite Home": "Suite.otf",
             }
 
         elif system_name == "Linux":
@@ -237,20 +240,20 @@ class HL_TextToImage:
 
         return lines
 
-    def txt_2_img(self, content, font, font_size, font_color, transparent, bg_color, max_chars_per_line, width,
-                  height, x_align, line_spacing, bold, y_align, by_ratio):
+    def txt_2_img(self, content, font, font_size, font_color, transparent, bg_color,color_code, max_chars_per_line, width,
+                  height, x_align, line_spacing, bold, y_align, by_ratio, rotation_angle):
 
+        # 1. 字体处理
         font_path = self._find_font_file(font)
         if font_path is None:
             font = ImageFont.load_default()
         else:
             font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
 
-
-        # 换行文本
+        # 2. 文本换行处理
         wrapped_lines = self._wrap_text(content, font, width - 40)  # 预留左右边距
 
-        # 计算文本尺寸
+        # 3. 计算文本尺寸
         temp_image = Image.new("RGBA", (1, 1))
         temp_draw = ImageDraw.Draw(temp_image)
         line_heights = []
@@ -266,7 +269,7 @@ class HL_TextToImage:
 
         total_text_height = sum(line_heights) + (len(wrapped_lines) - 1) * line_spacing
 
-        # 背景颜色
+        # 4. 背景颜色处理
         if transparent:
             background_color = (0, 0, 0, 0)  # 透明背景
         else:
@@ -281,11 +284,11 @@ class HL_TextToImage:
             }
             background_color = color_mapping.get(bg_color, (255, 255, 255))
 
-        # 创建图片
+        # 5. 创建图片
         img = Image.new("RGBA", (width, height), background_color)
         draw = ImageDraw.Draw(img)
 
-        # 文字颜色
+        # 6. 文字颜色处理
         font_color_mapping = {
             "black": (0, 0, 0, 255),
             "red": (255, 0, 0, 255),
@@ -301,51 +304,118 @@ class HL_TextToImage:
             "cyan": (0, 255, 255, 255),
         }
 
-        if font_color.startswith('#'):
+        # 处理颜色选择逻辑
+        if font_color == "by color code":
+            # 使用用户输入的颜色代码
             try:
-                text_fill = self.hex_to_rgba(font_color)
+                text_fill = self.hex_to_rgba(color_code)
             except:
+                # 如果颜色代码无效，使用黑色作为回退
                 text_fill = (0, 0, 0, 255)
+                print(f"警告：无效的颜色代码 '{color_code}'，已使用黑色替代")
         else:
+            # 使用预定义的颜色映射
             text_fill = font_color_mapping.get(font_color, (0, 0, 0, 255))
 
-        # 根据 y_align 参数计算文字绘制的起始 y 偏移量
+        # 7. 计算边距（基于字体大小）
+        margin = max(5, font_size // 6)  # 最小5像素，最大字体大小的1/6
+
+        # 8. 计算垂直偏移量（y_offset）
         if by_ratio != 0.0:
-            x_offset = int(width * by_ratio)
+            # 比例模式：按图像尺寸比例计算
+            x_offset_base = int(width * by_ratio)
             y_offset = int(height * by_ratio)
         else:
-            if y_align == "CENTER":
-                y_offset = (height - total_text_height) // 2
-            elif y_align == "TOP":
-                y_offset = 5
-            elif y_align == "BOTTOM":
-                y_offset = height - total_text_height - 5
+            # 传统对齐模式
+            # 处理文本高度大于画布的情况
+            if total_text_height > height:
+                y_offset = -margin
+                print(f"警告：文本高度({total_text_height}px)超过画布高度({height}px)，部分文本可能不可见")
             else:
-                y_offset = (height - total_text_height) // 2
+                # 根据垂直对齐方式计算y_offset
+                if y_align == "CENTER":
+                    y_offset = (height - total_text_height) // 2
+                elif y_align == "TOP":
+                    y_offset = margin
+                elif y_align == "BOTTOM":
+                    y_offset = height - total_text_height - margin
+                else:  # 默认为居中
+                    y_offset = (height - total_text_height) // 2
 
+        # 9. 绘制每行文本
         for line in wrapped_lines:
+            # 计算当前行尺寸
             text_bbox = font.getbbox(line)
             text_width = text_bbox[2] - text_bbox[0]
             text_height = text_bbox[3] - text_bbox[1]
 
+            # 计算当前行的水平偏移量（x_offset_line）
             if by_ratio != 0.0:
-                pass
+                # 比例模式：使用统一的基础偏移量
+                x_offset_line = x_offset_base
             else:
-                if x_align == "LEFT":
-                    x_offset = 10
-                elif x_align == "CENTER":
-                    x_offset = (width - text_width) // 2
-                elif x_align == "RIGHT":
-                    x_offset = width - text_width - 10  # 右对齐，留 10 像素边距
+                # 处理当前行宽度大于画布的情况
+                if text_width > width:
+                    x_offset_line = -margin
+                    print(f"警告：行文本宽度({text_width}px)超过画布宽度({width}px)，部分文本可能被裁剪")
+                else:
+                    # 根据水平对齐方式计算x_offset_line
+                    if x_align == "LEFT":
+                        x_offset_line = margin
+                    elif x_align == "CENTER":
+                        x_offset_line = (width - text_width) // 2
+                    elif x_align == "RIGHT":
+                        x_offset_line = width - text_width - margin
+                    else:  # 默认为左对齐
+                        x_offset_line = margin
 
-            self._draw_bold_text(draw, x_offset, y_offset, line, font, text_fill, bold)
+            # 绘制文本（支持加粗）
+            self._draw_bold_text(draw, x_offset_line, y_offset, line, font, text_fill, bold)
+
+            # 更新垂直位置（下一行）
             y_offset += text_height + line_spacing
 
-        # 转换为PyTorch Tensor
+        # 10. 应用旋转（如果有）
+        if rotation_angle != 0:
+            img = self._apply_rotation(img, rotation_angle, transparent, background_color)
+
+        # 11. 转换为PyTorch Tensor
         img_np = np.array(img).astype(np.float32) / 255.0
         img_tensor = torch.from_numpy(img_np).unsqueeze(0)
 
         return (img_tensor, content)
+
+    def _apply_rotation(self, image, angle, is_transparent, background_color):
+        """
+        将图像旋转指定角度
+
+        参数:
+            image: PIL.Image 对象
+            angle: 旋转角度（度）
+            is_transparent: 背景是否透明
+            background_color: 原始背景颜色
+
+        返回:
+            旋转后的 PIL.Image 对象
+        """
+        # 确定旋转后的填充色
+        if is_transparent:
+            fill_color = (0, 0, 0, 0)  # 透明填充
+        else:
+            # 处理背景色格式
+            if len(background_color) == 4:  # 已经是RGBA
+                fill_color = background_color
+            else:  # RGB格式
+                fill_color = background_color + (255,)  # 添加不透明通道
+
+        # 执行旋转
+        return image.rotate(
+            angle,
+            resample=Image.BICUBIC,  # 使用高质量插值
+            expand=False,  # 保持原始尺寸
+            fillcolor=fill_color  # 旋转后空白区域的填充色
+        )
+
 
     def _draw_bold_text(self, draw, x, y, text, font, fill, bold):
         """绘制加粗文本"""
@@ -356,6 +426,36 @@ class HL_TextToImage:
         else:
             draw.text((x, y), text, font=font, fill=fill)
 
+    def _apply_rotation(self, image, angle, is_transparent, background_color):
+        """
+        将图像旋转指定角度
+
+        参数:
+            image: PIL.Image 对象
+            angle: 旋转角度（度）
+            is_transparent: 背景是否透明
+            background_color: 原始背景颜色
+
+        返回:
+            旋转后的 PIL.Image 对象
+        """
+        # 确定旋转后的填充色
+        if is_transparent:
+            fill_color = (0, 0, 0, 0)  # 透明填充
+        else:
+            # 处理背景色格式
+            if len(background_color) == 4:  # 已经是RGBA
+                fill_color = background_color
+            else:  # RGB格式
+                fill_color = background_color + (255,)  # 添加不透明通道
+
+        # 执行旋转
+        return image.rotate(
+            angle,
+            resample=Image.BICUBIC,  # 使用高质量插值
+            expand=False,  # 保持原始尺寸
+            fillcolor=fill_color  # 旋转后空白区域的填充色
+        )
 
 class HL_FilterImage:
     def __init__(self):
