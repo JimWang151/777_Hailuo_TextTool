@@ -520,6 +520,179 @@ class HL_FilterImage:
         return (output_image, output_mask)
 
 
+import random
+from typing import List, Dict, Any
+
+class ZodiacPromptGenerator:
+    """生肖提示词生成器 - ComfyUI 插件"""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        """定义输入参数"""
+        return {
+            "required": {
+                "human_gender": ("STRING", {
+                    "multiline": False,
+                    "default": "man",
+                    "display": "人物性别"
+                }),
+                "base_seed": ("INT", {
+                    "default": 0,
+                    "min": 0,
+                    "max": 0xffffffffffffffff,
+                    "display": "基础种子"
+                }),
+            },
+            "optional": {
+                "human_desc": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "display": "人物描述"
+                }),
+            }
+        }
+
+    RETURN_TYPES = ("JOB", "INT", "INT[]", "STRING[]", "STRING[]")
+    RETURN_NAMES = ("prompt_collections", "seed_no", "seed_list", "prompt_list", "zodiac_list")
+    FUNCTION = "generate_zodiac_prompts"
+    CATEGORY = "Prompts/Zodiac"
+
+    def generate_zodiac_prompts(self, human_gender: str, base_seed: int, human_desc: str = "") -> tuple[List[Dict[str, Any]], int, List[int], List[str], List[str]]:
+        """
+        生成12个包含生肖、动作和种子的提示词集合，以及种子、提示词和生肖列表
+
+        参数:
+            human_gender: 提示词中的人物性别（例如 'man' 或 'woman'）
+            base_seed: 种子生成的基础值
+            human_desc: 人物描述（可选），若不为空则替换默认描述
+
+        返回:
+            prompt_collections: 包含提示词和种子的集合
+            seed_no: 最后一个使用的种子值
+            seed_list: 所有种子值的列表
+            prompt_list: 所有提示词的列表
+            zodiac_list: 生肖名称列表
+        """
+        # 生肖列表，按指定顺序
+        zodiac_map = [
+            {"en": "zodiac_mouse", "name": "Mouse"},
+            {"en": "zodiac_cow", "name": "Cow"},
+            {"en": "zodiac_tiger", "name": "Tiger"},
+            {"en": "zodiac_rabbit", "name": "Rabbit"},
+            {"en": "zodiac_dragon", "name": "Dragon"},
+            {"en": "zodiac_snake", "name": "Snake"},
+            {"en": "zodiac_horse", "name": "Horse"},
+            {"en": "zodiac_sheep", "name": "Sheep"},
+            {"en": "zodiac_monkey", "name": "Monkey"},
+            {"en": "zodiac_chicken", "name": "Chicken"},
+            {"en": "zodiac_dog", "name": "Dog"},
+            {"en": "zodiac_pig", "name": "Pig"}
+        ]
+
+        # 动作列表
+        action_list = [
+            'is kissing by',
+            'is holding by',
+            'is standing on the left shoulder of',
+            'is standing on the right shoulder of',
+            'is playing with'
+        ]
+
+        # 固定的提示词后缀
+        prompt_suffix = ", clear and detailed hands."
+
+        # 默认人物描述
+        default_desc = f"the {human_gender} with short black hair and a cheerful expression"
+
+        # 使用提供的描述或默认描述
+        human_description = human_desc if human_desc else default_desc
+
+        # 初始化结果集合
+        prompt_collections = []
+        seed_list = []
+        prompt_list = []
+        zodiac_list = [zodiac["name"] for zodiac in zodiac_map]
+
+        # 设置随机种子以确保可重复性
+        random.seed(base_seed)
+
+        try:
+            # 生成12个提示词
+            for zodiac in zodiac_map:
+                # 随机选择一个动作
+                action = random.choice(action_list)
+                # 构建完整的提示词
+                whole_prompt = (f"zodiac_cn, {zodiac['en']}, "
+                               f"the animal named {zodiac['en']} {action} a {human_gender}, "
+                               f"{human_description}{prompt_suffix}")
+                # 生成种子
+                current_seed = random.randint(0, 0xffffffffffffffff)
+                # 添加到集合
+                prompt_collections.append({
+                    "prompt": whole_prompt,
+                    "seed_no": current_seed
+                })
+                seed_list.append(current_seed)
+                prompt_list.append(whole_prompt)
+
+            print(f"✅ 成功生成 {len(prompt_collections)} 个提示词")
+            return (prompt_collections, current_seed, seed_list, prompt_list, zodiac_list)
+
+        except Exception as e:
+            print(f"❌ 生成提示词失败: {str(e)}")
+            return (prompt_collections, base_seed, seed_list, prompt_list, zodiac_list)
+
+
+from typing import List, Union
+
+class SelFromList:
+    """从列表中选择单个元素 - ComfyUI 插件"""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        """定义输入参数"""
+        return {
+            "required": {
+                "input_list": ("ANY",),
+                "select": ("INT", {
+                    "default": 0,
+                    "min": 0,
+                    "max": 99999,
+                    "step": 1,
+                    "display": "选择索引"
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("ANY",)
+    RETURN_NAMES = ("selected_item",)
+    INPUT_IS_LIST = (True,)
+    FUNCTION = "select"
+    CATEGORY = "Prompts/Zodiac"
+
+    def select(self, input_list: List[Union[int, str]], select: List[int]) -> tuple[Union[int, str]]:
+        """
+        根据索引从输入列表中选择单个元素
+
+        参数:
+            input_list: 输入的列表（可以是整数或字符串）
+            select: 要选择的索引
+
+        返回:
+            selected_item: 选中的单个元素
+        """
+        select_idx = select[0]  # 获取索引值
+        n = len(input_list)
+
+        # 如果索引超出范围，选择最后一个元素
+        if select_idx >= n:
+            select_idx = n - 1
+
+        try:
+            return (input_list[select_idx],)
+        except Exception as e:
+            print(f"❌ 选择元素失败: {str(e)}")
+            return (None,)
 
 
 
