@@ -599,7 +599,7 @@ class ZodiacPromptGenerator:
         ]
 
         # 固定的提示词后缀
-        prompt_suffix = ", (clear and detailed hands:1.3)."
+        prompt_suffix = ", (clear and detailed hands:1.1)."
 
         # 默认人物描述
         default_desc = f"the {human_gender} with short black hair and a cheerful expression"
