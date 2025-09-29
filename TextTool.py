@@ -520,21 +520,58 @@ class HL_FilterImage:
         return (output_image, output_mask)
 
 
+
+
+
+
+
+import os
+import json
 import random
+import time
 from typing import List, Dict, Any
 
-class ZodiacPromptGenerator:
-    """生肖提示词生成器 - ComfyUI 插件"""
+class SeedGenerator:
+    """种子生成器类"""
+    def __init__(self, mode: str, base_seed: int):
+        self.mode = mode
+        self.base_seed = base_seed
+        self.counter = 0
+        self.last_time = 0
+
+    def generate_seed(self) -> int:
+        """生成随机种子"""
+        if self.mode == "random":
+            current_time = int(time.time() * 1000)
+            if current_time == self.last_time:
+                self.counter += 1
+            else:
+                self.counter = 0
+                self.last_time = current_time
+
+            seed = (current_time + self.counter) % 0xffffffffffffffff
+            seed = seed ^ (random.randint(0, 0xffffffff) << 32)
+            return seed & 0xffffffffffffffff
+        else:
+            self.counter += 1
+            return (self.base_seed + self.counter) % 0xffffffffffffffff
+
+class ChiikawaPromptGenerator:
+    """Chiikawa提示词生成器 - ComfyUI 插件"""
 
     @classmethod
     def INPUT_TYPES(cls):
         """定义输入参数"""
         return {
             "required": {
-                "human_gender": ("STRING", {
+                "type": ("STRING", {
                     "multiline": False,
-                    "default": "man",
-                    "display": "人物性别"
+                    "default": "1",
+                    "display": "类型选择 (1: usagi, 2: chiikawa, 3: hachiiwa, 4: mixed)"
+                }),
+                "seed_mode": (["random", "fixed"], {
+                    "default": "random",
+                    "display": "种子生成模式"
                 }),
                 "base_seed": ("INT", {
                     "default": 0,
@@ -543,104 +580,162 @@ class ZodiacPromptGenerator:
                     "display": "基础种子"
                 }),
             },
-            "optional": {
-                "human_desc": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "display": "人物描述"
-                }),
-            }
         }
 
-    RETURN_TYPES = ("JOB", "INT", "INT[]", "STRING[]", "STRING[]")
-    RETURN_NAMES = ("prompt_collections", "seed_no", "seed_list", "prompt_list", "zodiac_list")
-    FUNCTION = "generate_zodiac_prompts"
-    CATEGORY = "Prompts/Zodiac"
+    RETURN_TYPES = ("JOB",)
+    RETURN_NAMES = ("prompt_collections",)
+    FUNCTION = "generate_prompts"
+    CATEGORY = "HL_Tools"
 
-    def generate_zodiac_prompts(self, human_gender: str, base_seed: int, human_desc: str = "") -> tuple[List[Dict[str, Any]], int, List[int], List[str], List[str]]:
+    def generate_prompts(self, type: str, seed_mode: str, base_seed: int) -> tuple[List[Dict[str, Any]]]:
         """
-        生成12个包含生肖、动作和种子的提示词集合，以及种子、提示词和生肖列表
+        从JSON文件中读取指定类型的提示词并生成种子
 
         参数:
-            human_gender: 提示词中的人物性别（例如 'man' 或 'woman'）
-            base_seed: 种子生成的基础值
-            human_desc: 人物描述（可选），若不为空则替换默认描述
+            type: 提示词类型 (1: usagi, 2: chiikawa, 3: hachiiwa, 4: mixed)
+            seed_mode: 种子生成模式
+            base_seed: 基础种子
 
         返回:
             prompt_collections: 包含提示词和种子的集合
-            seed_no: 最后一个使用的种子值
-            seed_list: 所有种子值的列表
-            prompt_list: 所有提示词的列表
-            zodiac_list: 生肖名称列表
         """
-        # 生肖列表，按指定顺序
-        zodiac_map = [
-            {"en": "zodiac_mouse", "name": "Mouse"},
-            {"en": "zodiac_cow", "name": "Cow"},
-            {"en": "zodiac_tiger", "name": "Tiger"},
-            {"en": "zodiac_rabbit", "name": "Rabbit"},
-            {"en": "zodiac_dragon", "name": "Dragon"},
-            {"en": "zodiac_snake", "name": "Snake"},
-            {"en": "zodiac_horse", "name": "Horse"},
-            {"en": "zodiac_sheep", "name": "Sheep"},
-            {"en": "zodiac_monkey", "name": "Monkey"},
-            {"en": "zodiac_chicken", "name": "Chicken"},
-            {"en": "zodiac_dog", "name": "Dog"},
-            {"en": "zodiac_pig", "name": "Pig"}
-        ]
+        # 创建种子生成器
+        seed_generator = SeedGenerator(seed_mode, base_seed)
 
-        # 动作列表
-        action_list = [
-            'is kissing by',
-            'is holding by',
-            'is standing on the left shoulder of',
-            'is standing on the right shoulder of',
-            'is playing with'
-        ]
-
-        # 固定的提示词后缀
-        prompt_suffix = ", (clear and detailed hands:1.1)."
-
-        # 默认人物描述
-        default_desc = f"the {human_gender} with short black hair and a cheerful expression"
-
-        # 使用提供的描述或默认描述
-        human_description = human_desc if human_desc else default_desc
-
-        # 初始化结果集合
+        # 准备结果集合
         prompt_collections = []
-        seed_list = []
-        prompt_list = []
-        zodiac_list = [zodiac["name"] for zodiac in zodiac_map]
 
-        # 设置随机种子以确保可重复性
-        random.seed(base_seed)
+        # 获取当前工作目录（ComfyUI根目录）
+        current_dir = os.path.dirname(os.path.abspath(__file__))
 
-        try:
-            # 生成12个提示词
-            for zodiac in zodiac_map:
-                # 随机选择一个动作
-                action = random.choice(action_list)
-                # 构建完整的提示词
-                whole_prompt = (f"zodiac_cn, {zodiac['en']}, "
-                               f"the animal named {zodiac['en']} {action} a {human_gender}, "
-                               f"{human_description}{prompt_suffix}")
-                # 生成种子
-                current_seed = random.randint(0, 0xffffffffffffffff)
-                # 添加到集合
-                prompt_collections.append({
-                    "prompt": whole_prompt,
-                    "seed_no": current_seed
-                })
-                seed_list.append(current_seed)
-                prompt_list.append(whole_prompt)
+        # 构建prompt文件夹路径并规范化
+        prompt_dir = os.path.normpath(os.path.join(current_dir, "prompt"))
 
-            print(f"✅ 成功生成 {len(prompt_collections)} 个提示词")
-            return (prompt_collections, current_seed, seed_list, prompt_list, zodiac_list)
+        # 检查prompt文件夹是否存在
+        if not os.path.exists(prompt_dir):
+            print(f"❌ 错误: prompt文件夹不存在: {prompt_dir}")
+            return (prompt_collections,)
 
-        except Exception as e:
-            print(f"❌ 生成提示词失败: {str(e)}")
-            return (prompt_collections, base_seed, seed_list, prompt_list, zodiac_list)
+        # 获取所有JSON文件
+        all_files = [f for f in os.listdir(prompt_dir) if f.endswith('.json')]
+
+        # 根据type选择文件
+        selected_files = []
+        prefix = None
+        if type == "1":
+            prefix = "usagi"
+            selected_files = [f for f in all_files if f.startswith("usagi_")]
+            selected_files = random.sample(selected_files, min(9, len(selected_files)))
+        elif type == "2":
+            prefix = "chiikawa"
+            selected_files = [f for f in all_files if f.startswith("chiikawa_")]
+            selected_files = random.sample(selected_files, min(9, len(selected_files)))
+        elif type == "3":
+            prefix = "hachiiwa"
+            selected_files = [f for f in all_files if f.startswith("hachiiwa_")]
+            selected_files = random.sample(selected_files, min(9, len(selected_files)))
+        elif type == "4":
+            multi_ch_files = [f for f in all_files if f.startswith("multi_ch_")]
+            hachiiwa_files = [f for f in all_files if f.startswith("hachiiwa_")]
+            chiikawa_files = [f for f in all_files if f.startswith("chiikawa_")]
+            usagi_files = [f for f in all_files if f.startswith("usagi_")]
+
+            # 确保multi_ch文件至少有4个
+            if len(multi_ch_files) < 4:
+                print(f"⚠️ 警告: multi_ch文件数量不足，仅有 {len(multi_ch_files)} 个")
+                return (prompt_collections,)
+
+            # 选择4个multi_ch文件
+            selected_files = random.sample(multi_ch_files, 4)
+            # 选择5个其他文件
+            other_files = hachiiwa_files + chiikawa_files + usagi_files
+            if len(other_files) < 5:
+                print(f"⚠️ 警告: 非multi_ch文件数量不足，仅有 {len(other_files)} 个")
+                return (prompt_collections,)
+            selected_files += random.sample(other_files, 5)
+            # 彻底打乱文件顺序
+            random.shuffle(selected_files)
+
+        if not selected_files:
+            # 回退到读取 {prefix}_001.json 文件
+            if type in ["1", "2", "3"]:
+                fallback_file = f"{prefix}_001.json"
+                fallback_path = os.path.normpath(os.path.join(prompt_dir, fallback_file))
+                if os.path.exists(fallback_path):
+                    try:
+                        with open(fallback_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            prompt = data.get("prompt")
+                            if isinstance(prompt, str) and prompt:
+                                seed = seed_generator.generate_seed()
+                                prompt_collections.append({
+                                    "prompt": prompt,
+                                    "seed": seed
+                                })
+                                print(f"✅ 回退读取成功: {fallback_file}")
+                                return (prompt_collections,)
+                            else:
+                                print(f"⚠️ 警告: 回退文件 {fallback_file} 的 'prompt' 键无效或为空")
+                    except json.JSONDecodeError as e:
+                        print(f"❌ 回退文件JSON解析失败: {fallback_file}, 错误: {str(e)}")
+                    except Exception as e:
+                        print(f"❌ 回退文件读取失败: {fallback_file}, 错误: {str(e)}")
+                else:
+                    print(f"❌ 错误: 回退文件 {fallback_file} 不存在")
+            else:
+                print(f"⚠️ 警告: 未找到符合条件的JSON文件 (type={type})，type=4无回退文件")
+            return (prompt_collections,)
+
+        # 处理每个选中的JSON文件
+        for file_name in selected_files:
+            file_path = os.path.normpath(os.path.join(prompt_dir, file_name))
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    prompt = data.get("prompt")
+                    if not isinstance(prompt, str) or not prompt:
+                        print(f"⚠️ 警告: 文件 {file_name} 的 'prompt' 键无效或为空，跳过")
+                        continue
+                    seed = seed_generator.generate_seed()
+                    prompt_collections.append({
+                        "prompt": prompt,
+                        "seed": seed
+                    })
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON解析失败: {file_name}, 错误: {str(e)}")
+                # 尝试回退到 {prefix}_001.json
+                if type in ["1", "2", "3"]:
+                    fallback_file = f"{prefix}_001.json"
+                    fallback_path = os.path.normpath(os.path.join(prompt_dir, fallback_file))
+                    if os.path.exists(fallback_path):
+                        try:
+                            with open(fallback_path, 'r', encoding='utf-8') as f:
+                                data = json.load(f)
+                                prompt = data.get("prompt")
+                                if isinstance(prompt, str) and prompt:
+                                    seed = seed_generator.generate_seed()
+                                    prompt_collections.append({
+                                        "prompt": prompt,
+                                        "seed": seed
+                                    })
+                                    print(f"✅ 回退读取成功: {fallback_file}")
+                                    continue
+                                else:
+                                    print(f"⚠️ 警告: 回退文件 {fallback_file} 的 'prompt' 键无效或为空")
+                        except json.JSONDecodeError as e:
+                            print(f"❌ 回退文件JSON解析失败: {fallback_file}, 错误: {str(e)}")
+                        except Exception as e:
+                            print(f"❌ 回退文件读取失败: {fallback_file}, 错误: {str(e)}")
+                    else:
+                        print(f"❌ 错误: 回退文件 {fallback_file} 不存在")
+                continue
+            except Exception as e:
+                print(f"❌ 读取文件失败: {file_name}, 错误: {str(e)}")
+                continue
+
+        print(f"✅ 成功读取 {len(prompt_collections)} 个提示词")
+        return (prompt_collections,)
+
 
 
 from typing import List, Union
@@ -668,7 +763,7 @@ class SelFromList:
     RETURN_NAMES = ("selected_item",)
     INPUT_IS_LIST = (True,)
     FUNCTION = "select"
-    CATEGORY = "Prompts/Zodiac"
+    CATEGORY = "HL_Tools"
 
     def select(self, input_list: List[Union[int, str]], select: List[int]) -> tuple[Union[int, str]]:
         """

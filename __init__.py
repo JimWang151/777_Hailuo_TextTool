@@ -13,12 +13,12 @@ python = sys.executable
 
 
 
-from .TextTool import HL_TextToImage,HL_FilterImage,ZodiacPromptGenerator,SelFromList
+from .TextTool import HL_TextToImage,HL_FilterImage,ChiikawaPromptGenerator,SelFromList
 
 NODE_CLASS_MAPPINGS = {
     "HL_TextToImage":HL_TextToImage,
     "HL_FilterImage":HL_FilterImage,
-    "ZodiacPromptGenerator":ZodiacPromptGenerator,
+"ChiikawaPromptGenerator":ChiikawaPromptGenerator,
     "SelFromList":SelFromList
 }
 
