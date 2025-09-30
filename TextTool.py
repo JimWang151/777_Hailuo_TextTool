@@ -521,10 +521,6 @@ class HL_FilterImage:
 
 
 
-
-
-
-
 import os
 import json
 import random
@@ -569,6 +565,10 @@ class ChiikawaPromptGenerator:
                     "default": "1",
                     "display": "类型选择 (1: usagi, 2: chiikawa, 3: hachiiwa, 4: mixed)"
                 }),
+                "source": (["base", "advanced"], {
+                    "default": "base",
+                    "display": "文件来源 (base: prompt文件夹, advanced: advanced文件夹)"
+                }),
                 "seed_mode": (["random", "fixed"], {
                     "default": "random",
                     "display": "种子生成模式"
@@ -587,12 +587,13 @@ class ChiikawaPromptGenerator:
     FUNCTION = "generate_prompts"
     CATEGORY = "HL_Tools"
 
-    def generate_prompts(self, type: str, seed_mode: str, base_seed: int) -> tuple[List[Dict[str, Any]]]:
+    def generate_prompts(self, type: str, source: str, seed_mode: str, base_seed: int) -> tuple[List[Dict[str, Any]]]:
         """
         从JSON文件中读取指定类型的提示词并生成种子
 
         参数:
             type: 提示词类型 (1: usagi, 2: chiikawa, 3: hachiiwa, 4: mixed)
+            source: 文件来源 (base: prompt文件夹, advanced: advanced文件夹)
             seed_mode: 种子生成模式
             base_seed: 基础种子
 
@@ -608,12 +609,13 @@ class ChiikawaPromptGenerator:
         # 获取当前工作目录（ComfyUI根目录）
         current_dir = os.path.dirname(os.path.abspath(__file__))
 
-        # 构建prompt文件夹路径并规范化
-        prompt_dir = os.path.normpath(os.path.join(current_dir, "prompt"))
+        # 根据source选择文件夹
+        folder_name = "prompt" if source == "base" else "advanced"
+        prompt_dir = os.path.normpath(os.path.join(current_dir, folder_name))
 
-        # 检查prompt文件夹是否存在
+        # 检查文件夹是否存在
         if not os.path.exists(prompt_dir):
-            print(f"❌ 错误: prompt文件夹不存在: {prompt_dir}")
+            print(f"❌ 错误: {folder_name}文件夹不存在: {prompt_dir}")
             return (prompt_collections,)
 
         # 获取所有JSON文件
@@ -624,21 +626,21 @@ class ChiikawaPromptGenerator:
         prefix = None
         if type == "1":
             prefix = "usagi"
-            selected_files = [f for f in all_files if f.startswith("usagi_")]
+            selected_files = [f for f in all_files if f.startswith("usagi_") and f.endswith(tuple(f"_{i:03d}.json" for i in range(1, 19)))]
             selected_files = random.sample(selected_files, min(9, len(selected_files)))
         elif type == "2":
             prefix = "chiikawa"
-            selected_files = [f for f in all_files if f.startswith("chiikawa_")]
+            selected_files = [f for f in all_files if f.startswith("chiikawa_") and f.endswith(tuple(f"_{i:03d}.json" for i in range(1, 19)))]
             selected_files = random.sample(selected_files, min(9, len(selected_files)))
         elif type == "3":
             prefix = "hachiiwa"
-            selected_files = [f for f in all_files if f.startswith("hachiiwa_")]
+            selected_files = [f for f in all_files if f.startswith("hachiiwa_") and f.endswith(tuple(f"_{i:03d}.json" for i in range(1, 19)))]
             selected_files = random.sample(selected_files, min(9, len(selected_files)))
         elif type == "4":
-            multi_ch_files = [f for f in all_files if f.startswith("multi_ch_")]
-            hachiiwa_files = [f for f in all_files if f.startswith("hachiiwa_")]
-            chiikawa_files = [f for f in all_files if f.startswith("chiikawa_")]
-            usagi_files = [f for f in all_files if f.startswith("usagi_")]
+            multi_ch_files = [f for f in all_files if f.startswith("multi_ch_") and f.endswith(tuple(f"_{i:03d}.json" for i in range(1, 19)))]
+            hachiiwa_files = [f for f in all_files if f.startswith("hachiiwa_") and f.endswith(tuple(f"_{i:03d}.json" for i in range(1, 19)))]
+            chiikawa_files = [f for f in all_files if f.startswith("chiikawa_") and f.endswith(tuple(f"_{i:03d}.json" for i in range(1, 19)))]
+            usagi_files = [f for f in all_files if f.startswith("usagi_") and f.endswith(tuple(f"_{i:03d}.json" for i in range(1, 19)))]
 
             # 确保multi_ch文件至少有4个
             if len(multi_ch_files) < 4:
@@ -695,6 +697,31 @@ class ChiikawaPromptGenerator:
                     prompt = data.get("prompt")
                     if not isinstance(prompt, str) or not prompt:
                         print(f"⚠️ 警告: 文件 {file_name} 的 'prompt' 键无效或为空，跳过")
+                        # 尝试回退到 {prefix}_001.json
+                        if type in ["1", "2", "3"]:
+                            fallback_file = f"{prefix}_001.json"
+                            fallback_path = os.path.normpath(os.path.join(prompt_dir, fallback_file))
+                            if os.path.exists(fallback_path):
+                                try:
+                                    with open(fallback_path, 'r', encoding='utf-8') as f:
+                                        data = json.load(f)
+                                        prompt = data.get("prompt")
+                                        if isinstance(prompt, str) and prompt:
+                                            seed = seed_generator.generate_seed()
+                                            prompt_collections.append({
+                                                "prompt": prompt,
+                                                "seed": seed
+                                            })
+                                            print(f"✅ 回退读取成功: {fallback_file}")
+                                            continue
+                                        else:
+                                            print(f"⚠️ 警告: 回退文件 {fallback_file} 的 'prompt' 键无效或为空")
+                                except json.JSONDecodeError as e:
+                                    print(f"❌ 回退文件JSON解析失败: {fallback_file}, 错误: {str(e)}")
+                                except Exception as e:
+                                    print(f"❌ 回退文件读取失败: {fallback_file}, 错误: {str(e)}")
+                            else:
+                                print(f"❌ 错误: 回退文件 {fallback_file} 不存在")
                         continue
                     seed = seed_generator.generate_seed()
                     prompt_collections.append({
@@ -735,7 +762,6 @@ class ChiikawaPromptGenerator:
 
         print(f"✅ 成功读取 {len(prompt_collections)} 个提示词")
         return (prompt_collections,)
-
 
 
 from typing import List, Union
@@ -788,7 +814,4 @@ class SelFromList:
         except Exception as e:
             print(f"❌ 选择元素失败: {str(e)}")
             return (None,)
-
-
-
 
